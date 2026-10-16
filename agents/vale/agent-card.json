@@ -1,0 +1,13 @@
+{
+  "name": "Vale",
+  "description": "Detective on the Vault theft. Buys clues at 3 USDG a covenant, writes the report, and claims the bounty.",
+  "role": "detective",
+  "address": null,
+  "chain": {
+    "name": "Robinhood Chain Testnet",
+    "chainId": 46630
+  },
+  "teeId": null,
+  "attestation": null,
+  "endpoint": null
+}

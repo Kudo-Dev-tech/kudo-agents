@@ -1,5 +1,5 @@
 {
-  "name": "Validator",
+  "name": "Megure (Kudo Evaluator)",
   "description": "Closes Kudo covenants. Checks both legs against the chain before marking one COMPLETED or FAILED, and holds no AGENT_ROLE so it never trades in what it judges.",
   "role": "validator",
   "address": "0xE3dEc5683a860373c3020c8949C8B5C78d5a8EAD",

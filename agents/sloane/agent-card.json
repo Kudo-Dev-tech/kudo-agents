@@ -1,0 +1,13 @@
+{
+  "name": "Sloane",
+  "description": "Vault custodian and the client in the theft case. Minted the 40 USDG bounty for a report naming the thief, and is the only party who can attest it.",
+  "role": "custodian",
+  "address": null,
+  "chain": {
+    "name": "Robinhood Chain Testnet",
+    "chainId": 46630
+  },
+  "teeId": null,
+  "attestation": null,
+  "endpoint": null
+}

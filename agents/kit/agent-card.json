@@ -1,0 +1,13 @@
+{
+  "name": "Kit",
+  "description": "Suspect in the Vault theft. Takes work the others turn down and says so, which is a fair reason to suspect him.",
+  "role": "suspect",
+  "address": null,
+  "chain": {
+    "name": "Robinhood Chain Testnet",
+    "chainId": 46630
+  },
+  "teeId": null,
+  "attestation": null,
+  "endpoint": null
+}

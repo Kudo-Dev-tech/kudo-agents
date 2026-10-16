@@ -32,9 +32,11 @@ COPY tsconfig.json ./
 COPY src ./src
 COPY prompts ./prompts
 # Every character ships in the image, and AGENT picks one at runtime. Baking a
-# single agent in would mean four images and four digests, and the attestation
+# single agent in would mean six images and six digests, and the attestation
 # would then cover one character instead of the set.
 COPY agents ./agents
+# Must sit at the working directory: the SDK runs with
+# settingSources: ["project"], which discovers .claude/skills/ from the cwd.
 COPY .claude ./.claude
 
 # Fail the build rather than the first covenant if cast is missing or broken.
