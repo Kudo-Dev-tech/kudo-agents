@@ -65,6 +65,8 @@ code { font-family: var(--mono); font-size: 13px; }
 
 .chip { font-size: 12px; padding: 3px 9px; border-radius: 999px; background: var(--surface-2); border: 1px solid var(--border); color: var(--muted); white-space: nowrap; }
 
+.demo { background: var(--warn-soft); color: var(--warn); border-radius: var(--radius); padding: 10px 14px; margin: 0 0 16px; font-size: 14px; }
+
 .notice { display: flex; gap: 14px; background: var(--ok-soft); border: 1px solid color-mix(in srgb, var(--ok) 30%, transparent); border-radius: var(--radius); padding: 16px; margin-bottom: 20px; }
 .notice h2 { color: var(--ok); margin-bottom: 4px; }
 .notice-icon { font-size: 22px; line-height: 1; }

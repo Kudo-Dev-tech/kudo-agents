@@ -18,6 +18,8 @@ const STAGE_LABEL = {
 let token = readToken();
 let settings = null;
 let pollTimer = null;
+/** Set when there is no launcher behind this page; see demo.js. */
+let demo = null;
 
 // --- storage: may be unavailable (private mode, blocked site data) ---
 
@@ -31,6 +33,7 @@ function writeToken(value) {
 // --- api ---
 
 async function api(path, options = {}) {
+  if (demo) return demo.api(path, options);
   const response = await fetch(path, {
     ...options,
     headers: { "content-type": "application/json", authorization: `Bearer ${token}`, ...options.headers },
@@ -402,8 +405,27 @@ $("#refresh").addEventListener("click", refresh);
 
 // --- start ---
 
+/**
+ * A real launcher answers /api without a token with 401. Anything else - a 404
+ * from a static host, or no answer at all - means there is no launcher here,
+ * so the page runs on demo data instead of stopping at the token screen.
+ */
+async function hasLauncher() {
+  if (new URLSearchParams(location.search).has("demo")) return false;
+  try {
+    return (await fetch("/api/config")).status === 401;
+  } catch {
+    return false;
+  }
+}
+
 async function start() {
-  if (!token) return showAuth();
+  if (!(await hasLauncher())) {
+    demo = window.kudoDemo;
+    $("#demo").hidden = false;
+  } else if (!token) {
+    return showAuth();
+  }
   try {
     settings = await api("/api/config");
   } catch (failure) {
