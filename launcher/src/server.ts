@@ -1,5 +1,7 @@
 /**
- * The launcher's HTTP API, and the UI in public/.
+ * The launcher's HTTP API. The UI is the Launch page in kudo-client, served
+ * from another origin, which is why this answers CORS for the origins in
+ * LAUNCHER_ALLOWED_ORIGINS.
  *
  *   GET  /api/config                    network, gas sponsorship terms, treasury
  *   GET  /api/agents                    every agent, with live state and balance
@@ -9,14 +11,10 @@
  *   GET  /api/agents/:slug/logs         its container's recent output
  *   POST /api/agents/:slug/message      {"message": "..."} -> the agent's answer
  *
- * Every /api route needs `Authorization: Bearer <LAUNCHER_TOKEN>`. The static
- * UI does not - it holds nothing until the token is entered.
+ * Every /api route needs `Authorization: Bearer <LAUNCHER_TOKEN>`.
  */
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
-import { readFile } from "node:fs/promises";
 import { timingSafeEqual } from "node:crypto";
-import { dirname, extname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
 
 import { BUILT_IN_TASKS, type LaunchRequest } from "./bundle.ts";
 import { balanceOf, hasAgentRole, weiToEth } from "./chain.ts";
@@ -26,15 +24,7 @@ import { InvalidBundle, launch, retry } from "./launch.ts";
 import { containerLogs, containerState, messageAgent, resumeContainer, stopContainer } from "./runtime.ts";
 import { getAgent, listAgents, updateAgent, type AgentRecord } from "./store.ts";
 
-const PUBLIC_DIR = resolve(dirname(fileURLToPath(import.meta.url)), "..", "public");
 const MAX_BODY_BYTES = 1024 * 1024;
-
-const TYPES: Record<string, string> = {
-  ".html": "text/html; charset=utf-8",
-  ".js": "text/javascript; charset=utf-8",
-  ".css": "text/css; charset=utf-8",
-  ".svg": "image/svg+xml",
-};
 
 function sendJson(response: ServerResponse, status: number, body: unknown): void {
   const payload = JSON.stringify(body);
@@ -149,22 +139,30 @@ async function api(request: IncomingMessage, response: ServerResponse, path: str
   return sendJson(response, 405, { error: `${method} not allowed here.` });
 }
 
-async function serveStatic(response: ServerResponse, path: string): Promise<void> {
-  const file = resolve(PUBLIC_DIR, `.${path === "/" ? "/index.html" : path}`);
-  if (!file.startsWith(PUBLIC_DIR)) return sendJson(response, 404, { error: "Not found." });
-  try {
-    const body = await readFile(file);
-    response.writeHead(200, { "Content-Type": TYPES[extname(file)] ?? "application/octet-stream" });
-    response.end(body);
-  } catch {
-    sendJson(response, 404, { error: "Not found." });
-  }
+/**
+ * Lets the Launch page call this from its own origin. Only origins listed in
+ * LAUNCHER_ALLOWED_ORIGINS get the header; anything else is refused by the
+ * browser, token or not.
+ */
+function allowCors(request: IncomingMessage, response: ServerResponse): void {
+  const origin = request.headers.origin;
+  if (!origin || !config.allowedOrigins.includes(origin)) return;
+
+  response.setHeader("Access-Control-Allow-Origin", origin);
+  response.setHeader("Vary", "Origin");
+  response.setHeader("Access-Control-Allow-Headers", "authorization, content-type");
+  response.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+  response.setHeader("Access-Control-Max-Age", "600");
 }
 
 async function route(request: IncomingMessage, response: ServerResponse): Promise<void> {
   const path = new URL(request.url ?? "/", "http://launcher").pathname;
 
-  if (!path.startsWith("/api/")) return serveStatic(response, path);
+  allowCors(request, response);
+  // A preflight carries no token; it only asks whether the real request may follow.
+  if (request.method === "OPTIONS") return void response.writeHead(204).end();
+
+  if (!path.startsWith("/api/")) return sendJson(response, 404, { error: "Not found. The API is under /api/." });
   if (!authorised(request)) return sendJson(response, 401, { error: "Missing or wrong launcher token." });
 
   try {

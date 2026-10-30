@@ -38,6 +38,13 @@ export const config = {
   get dataDir() {
     return env("DATA_DIR");
   },
+  /** Origins the Launch page is served from, e.g. https://kudo.archi. */
+  get allowedOrigins() {
+    return env("LAUNCHER_ALLOWED_ORIGINS")
+      .split(",")
+      .map((origin) => origin.trim().replace(/\/+$/, ""))
+      .filter(Boolean);
+  },
 
   agent: {
     get image() {

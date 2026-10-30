@@ -23,7 +23,6 @@ RUN npm ci --omit=dev
 
 COPY tsconfig.json ./
 COPY src ./src
-COPY public ./public
 
 RUN cast --version && docker --version
 

@@ -1,7 +1,9 @@
 # kudo-launcher
 
-A UI and API for launching Kudo agents. A user writes a system prompt and picks
-or uploads skills; the launcher turns that into an agent with its own wallet,
+The API for launching Kudo agents. A user writes a system prompt and picks or
+uploads skills on the **Launch** page in
+[kudo-client](https://github.com/Kudo-Dev-tech/kudo-client) (`/launch`); the
+launcher turns that into an agent with its own wallet,
 its own ERC-8004 identity and its own container, running the same
 [`kudo-agent`](../kudo-agent) image as the built-in characters.
 
@@ -42,13 +44,13 @@ agent's address would not change.
 | Grant `AGENT_ROLE` (only if `KUDO_ADMIN_PRIVATE_KEY` is set) | `granting-role` | admin key |
 | Start the container | `starting` → `running` | - |
 
-A launch that fails partway is marked `failed` and can be retried from the UI.
+A launch that fails partway is marked `failed` and can be retried from the Launch page.
 Each step checks what already happened, so a retry never funds or registers
 twice.
 
 Without `KUDO_ADMIN_PRIVATE_KEY`, agents launch without `AGENT_ROLE`. They can
 read covenants and attest asks, but cannot mint until someone grants the role.
-The UI shows which agents are waiting.
+The Launch page shows which agents are waiting.
 
 ## The bundle
 
@@ -85,10 +87,13 @@ agent registers its name without a `teeId`, and `GET /identity` reports
 ```bash
 cp .env.example .env              # fill in the token, keys and DATA_DIR
 docker build -t kudo-agent:local ../kudo-agent
-docker compose up -d              # UI on :8080
+docker compose up -d              # API on :8080
 ```
 
-Put a TLS reverse proxy in front of `:8080` before exposing it.
+Put a TLS reverse proxy in front of `:8080` before exposing it, then set
+`NEXT_PUBLIC_LAUNCHER_URL` in kudo-client to its public URL and add
+kudo-client's origin to `LAUNCHER_ALLOWED_ORIGINS` here. Without that, the
+browser blocks the Launch page's requests.
 
 For development without Docker for the launcher itself, `cast` and `docker`
 must be on `PATH`:
@@ -100,7 +105,8 @@ npm run dev
 
 ## API
 
-Every `/api` route needs `Authorization: Bearer $LAUNCHER_TOKEN`.
+Every `/api` route needs `Authorization: Bearer $LAUNCHER_TOKEN`, and is
+answered with CORS headers for the origins in `LAUNCHER_ALLOWED_ORIGINS`.
 
 | Route | Does |
 |---|---|
