@@ -1,5 +1,9 @@
 /** Environment checks, run once at startup so failures are loud and early. */
-import { availableAgents } from "./agent/prompts.ts";
+import { access } from "node:fs/promises";
+import { join } from "node:path";
+
+import { availableAgents, bundleDir } from "./agent/prompts.ts";
+import { agentWorkspace } from "./agent/skills.ts";
 
 const REQUIRED = [
   "AGENT",
@@ -41,6 +45,22 @@ export function requireEnvironment(): void {
  */
 export async function requireKnownAgent(): Promise<void> {
   const slug = process.env.AGENT!.trim().toLowerCase();
+  const bundle = bundleDir();
+
+  // A launched agent is defined by its bundle, not by a directory in agents/.
+  // Build its skills workspace now too, so a bad bundle fails at startup.
+  if (bundle) {
+    try {
+      await access(join(bundle, "system.md"));
+      await agentWorkspace();
+    } catch (error) {
+      console.error(`Bundle at ${bundle} is unusable: ${(error as Error).message}`);
+      process.exit(1);
+    }
+    console.log(`running as ${slug} (launched, bundle ${bundle})`);
+    return;
+  }
+
   const known = await availableAgents();
 
   if (known.includes(slug)) {

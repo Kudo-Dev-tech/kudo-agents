@@ -1,0 +1,6 @@
+.env
+.env.*
+!.env.example
+node_modules/
+# Bundles, agent keys and the gas ledger. Never committed.
+data/

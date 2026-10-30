@@ -15,6 +15,16 @@
  *
  * Task prompts (prompts/<name>.txt) are shared for the same reason: what the
  * settler does each round should not depend on who is settling.
+ *
+ * An agent started by the launcher has no directory in agents/ - its user wrote
+ * it. AGENT_BUNDLE_DIR then points at the bundle the launcher mounted:
+ *
+ *   <bundle>/system.md          who this one is, in its user's words
+ *   <bundle>/prompts/*.txt      its own task prompts
+ *   <bundle>/skills/<name>/     its own skills (see skills.ts)
+ *
+ * and agents/_launched.md is placed between the two, so a launched agent is
+ * told what the platform does for it (gas) before it reads its character.
  */
 import { readFile, readdir } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
@@ -25,6 +35,12 @@ const AGENTS_DIR = join(ROOT, "agents");
 const PROMPTS_DIR = join(ROOT, "prompts");
 
 const SAFE_NAME = /^[a-z0-9][a-z0-9-]*$/i;
+
+/** The launcher's bundle for this agent, or undefined for a built-in character. */
+export function bundleDir(): string | undefined {
+  const dir = process.env.AGENT_BUNDLE_DIR?.trim();
+  return dir ? resolve(dir) : undefined;
+}
 
 /** Directory name of the agent this process is running as. */
 export function agentSlug(): string {
@@ -57,8 +73,17 @@ export async function availableAgents(): Promise<string[]> {
  */
 export async function loadSystemPrompt(): Promise<string> {
   const slug = agentSlug();
+  const bundle = bundleDir();
 
   const common = await readFile(join(AGENTS_DIR, "_common.md"), "utf8");
+
+  if (bundle) {
+    const launched = await readFile(join(AGENTS_DIR, "_launched.md"), "utf8");
+    const character = await readFile(join(bundle, "system.md"), "utf8").catch(() => {
+      throw new Error(`No system.md in the bundle at ${bundle}.`);
+    });
+    return [common, launched, character].map((part) => part.trim()).join("\n\n---\n\n");
+  }
 
   let character: string;
   try {
@@ -77,6 +102,8 @@ export async function loadSystemPrompt(): Promise<string> {
  *   agents/<AGENT>/prompts/<name>.txt   this agent's own work
  *   prompts/<name>.txt                  work several agents share
  *
+ * A launched agent's own work lives in its bundle instead of agents/<AGENT>/.
+ *
  * The agent's own directory wins. A prompt that only one agent should ever run
  * lives only there, so another agent configured to run it fails at the first
  * tick rather than attempting something it has no business doing — `validate`
@@ -91,10 +118,9 @@ export async function loadPrompt(name: string): Promise<string> {
   }
 
   const slug = agentSlug();
-  const candidates = [
-    join(AGENTS_DIR, slug, "prompts", `${name}.txt`),
-    join(PROMPTS_DIR, `${name}.txt`),
-  ];
+  const bundle = bundleDir();
+  const own = bundle ? join(bundle, "prompts") : join(AGENTS_DIR, slug, "prompts");
+  const candidates = [join(own, `${name}.txt`), join(PROMPTS_DIR, `${name}.txt`)];
 
   for (const path of candidates) {
     try {
@@ -105,6 +131,6 @@ export async function loadPrompt(name: string): Promise<string> {
   }
 
   throw new Error(
-    `No prompt "${name}" for ${slug}. Looked in agents/${slug}/prompts/ and prompts/.`,
+    `No prompt "${name}" for ${slug}. Looked in ${own}/ and prompts/.`,
   );
 }

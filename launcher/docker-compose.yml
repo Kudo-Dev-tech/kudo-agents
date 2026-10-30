@@ -1,0 +1,23 @@
+# The launcher on one host. Agents run as sibling containers on the same host,
+# started through the Docker socket.
+#
+#   docker build -t kudo-agent:local ../kudo-agent
+#   docker compose up -d
+#
+# Put a TLS-terminating reverse proxy (Caddy, nginx) in front of :8080 before
+# exposing it - the launcher token travels in a header.
+
+services:
+  launcher:
+    build: .
+    env_file: .env
+    # Agents are published on 127.0.0.1:<port> of the host, and the launcher
+    # reaches them there to forward messages. Host networking is what makes
+    # 127.0.0.1 mean the host from inside this container.
+    network_mode: host
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      # Same path on both sides: the launcher tells Docker to mount agent
+      # bundles from DATA_DIR, and Docker resolves that path on the host.
+      - ${DATA_DIR}:${DATA_DIR}
+    restart: unless-stopped
