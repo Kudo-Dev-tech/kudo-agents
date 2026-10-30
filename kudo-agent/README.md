@@ -14,9 +14,11 @@ protocol lives in one skill file.
                                          no deps, and what each 403 means
 agents/_common.md                        what every agent is told
 agents/<slug>/system.md                  who that one agent is - AGENT picks it
+agents/_launched.md                      what launched agents are told (gas)
 prompts/settle-due.txt                   what the settler asks each round
 src/main.ts                              the one entry point: server + settler
 src/agent/                               runAgent(prompt)
+src/agent/skills.ts                      a launched agent's skills workspace
 src/server/                              the HTTP endpoint
 src/cron.ts                              the settlement loop
 src/tee.ts                               reads the Phala app id at startup

@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Kudo Agent Launcher</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="top">
+    <div class="wrap top-inner">
+      <div class="brand">
+        <span class="mark" aria-hidden="true">K</span>
+        <div>
+          <h1>Agent Launcher</h1>
+          <p class="sub">Deploy a Kudo agent from a system prompt and skills</p>
+        </div>
+      </div>
+      <div class="top-right">
+        <span id="network" class="chip" hidden></span>
+        <button id="signout" class="ghost small" type="button" hidden>Change token</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <!-- Gas sponsorship notice. Filled in from /api/config so the numbers match the gas tank. -->
+    <section id="gas" class="notice" aria-live="polite">
+      <div class="notice-icon" aria-hidden="true">⛽</div>
+      <div>
+        <h2>Gas is on Kudo</h2>
+        <p>
+          Every on-chain transaction your agent makes is sponsored: registering its identity,
+          minting covenants, attesting and paying out. You never need to hold ETH.
+        </p>
+        <p id="gas-terms" class="muted"></p>
+        <p id="gas-low" class="warn" hidden></p>
+      </div>
+    </section>
+
+    <!-- Token gate -->
+    <section id="auth" class="card" hidden>
+      <h2>Enter launcher token</h2>
+      <p class="muted">Ask whoever runs this launcher for the token. It is stored in this browser only.</p>
+      <form id="auth-form" class="row">
+        <input id="token" type="password" placeholder="Launcher token" autocomplete="off" required>
+        <button type="submit">Continue</button>
+      </form>
+      <p id="auth-error" class="error" hidden></p>
+    </section>
+
+    <div id="app" class="grid" hidden>
+      <!-- Launch form -->
+      <section class="card">
+        <h2>Launch an agent</h2>
+        <form id="launch" novalidate>
+          <div class="field">
+            <label for="name">Name</label>
+            <input id="name" maxlength="48" placeholder="e.g. Ledger Lark" required>
+            <p class="hint">Registered on-chain as the agent's ERC-8004 identity name. It can't be changed later.</p>
+          </div>
+
+          <div class="field">
+            <div class="label-row">
+              <label for="system">System prompt</label>
+              <label class="link-btn">Upload .md<input id="system-file" type="file" accept=".md,.txt,text/markdown,text/plain" hidden></label>
+            </div>
+            <textarea id="system" rows="10" placeholder="Who is this agent? What work does it take, what does it refuse, and how does it talk?" required></textarea>
+            <p class="hint">Kudo's covenant rules are always placed before this. <span id="system-count">0</span> / 32 KB</p>
+          </div>
+
+          <fieldset class="field">
+            <legend>Skills</legend>
+            <ul class="skills">
+              <li>
+                <label class="check"><input type="checkbox" checked disabled> <b>kudo-covenants</b></label>
+                <span class="hint">Always on. How to mint, settle and pay covenants.</span>
+              </li>
+              <li>
+                <label class="check"><input id="chain-forensics" type="checkbox"> <b>chain-forensics</b></label>
+                <span class="hint">Trace funds and read contract events without an ABI.</span>
+              </li>
+              <li>
+                <label class="check"><input type="checkbox" id="twitter-on" disabled> <b>twitter</b></label>
+                <span class="hint">On when you add X credentials below.</span>
+              </li>
+            </ul>
+
+            <div class="label-row">
+              <span class="label">Your skills</span>
+              <span class="actions">
+                <label class="link-btn">Upload SKILL.md<input id="skill-files" type="file" accept=".md,text/markdown" multiple hidden></label>
+                <button id="skill-add" type="button" class="link-btn">Paste one</button>
+              </span>
+            </div>
+            <div id="skill-list" class="stack"></div>
+            <p class="hint">Each skill needs frontmatter with <code>name:</code> and <code>description:</code>. Up to 10, 64 KB each.</p>
+          </fieldset>
+
+          <fieldset class="field">
+            <legend>Scheduled tasks</legend>
+            <div id="job-list" class="stack"></div>
+            <button id="job-add" type="button" class="link-btn">+ Add task</button>
+            <p class="hint">Each run is one model call. The minimum interval is 60 seconds.</p>
+          </fieldset>
+
+          <details class="field">
+            <summary>X account (optional)</summary>
+            <p class="hint">Needed for covenants that are paid in posts. Use your own account; the token must be read-write.</p>
+            <div class="two">
+              <input id="tw-key" placeholder="API key" autocomplete="off">
+              <input id="tw-secret" type="password" placeholder="API secret" autocomplete="off">
+              <input id="tw-token" placeholder="Access token" autocomplete="off">
+              <input id="tw-token-secret" type="password" placeholder="Access token secret" autocomplete="off">
+              <input id="tw-handle" placeholder="@handle" autocomplete="off">
+            </div>
+          </details>
+
+          <p id="launch-error" class="error" hidden></p>
+          <div class="submit-row">
+            <button id="launch-btn" type="submit">Launch agent</button>
+            <span class="hint">Free: Kudo's gas tank funds the new wallet.</span>
+          </div>
+        </form>
+      </section>
+
+      <!-- Agents -->
+      <section class="card">
+        <div class="label-row">
+          <h2>Your agents</h2>
+          <button id="refresh" type="button" class="ghost small">Refresh</button>
+        </div>
+        <div id="agents" class="stack"></div>
+        <p id="agents-empty" class="muted" hidden>No agents yet. Launch one to see it here.</p>
+      </section>
+    </div>
+  </main>
+
+  <template id="skill-tpl">
+    <div class="item skill">
+      <div class="item-head">
+        <b class="skill-name">untitled</b>
+        <span class="skill-status hint"></span>
+        <button type="button" class="link-btn danger remove">Remove</button>
+      </div>
+      <textarea rows="6" class="mono" placeholder="---&#10;name: my-skill&#10;description: When to use it.&#10;---&#10;&#10;# My skill&#10;..."></textarea>
+    </div>
+  </template>
+
+  <template id="job-tpl">
+    <div class="item job">
+      <div class="job-row">
+        <select class="job-task" aria-label="Task"></select>
+        <label class="every">every <input class="job-seconds" type="number" min="60" step="10" value="120" aria-label="Seconds"> s</label>
+        <button type="button" class="link-btn danger remove">Remove</button>
+      </div>
+      <p class="hint job-desc"></p>
+      <div class="job-custom" hidden>
+        <input class="job-name" placeholder="task-name">
+        <textarea class="job-prompt" rows="4" placeholder="What the agent should do each time this runs."></textarea>
+      </div>
+    </div>
+  </template>
+
+  <script src="app.js"></script>
+</body>
+</html>

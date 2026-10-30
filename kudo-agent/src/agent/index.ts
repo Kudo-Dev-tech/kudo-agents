@@ -13,6 +13,7 @@ import {
 } from "@anthropic-ai/claude-agent-sdk";
 
 import { loadSystemPrompt } from "./prompts.ts";
+import { agentWorkspace } from "./skills.ts";
 
 export { loadPrompt } from "./prompts.ts";
 
@@ -42,10 +43,14 @@ const RESILIENCE_ENV = {
   CLAUDE_STREAM_IDLE_TIMEOUT_MS: "300000",
 };
 
-function agentOptions(systemPrompt: string): Options {
+function agentOptions(systemPrompt: string, cwd: string): Options {
   return {
     model: "claude-opus-5",
     systemPrompt,
+
+    // The app directory for a built-in character; for a launched agent, a
+    // workspace that adds its user's skills to the platform's (skills.ts).
+    cwd,
 
     // Skills live in .claude/skills/, which is a project setting source.
     //
@@ -127,7 +132,7 @@ function assertSucceeded(result: SDKResultMessage): void {
  * is a 500 or a logged line.
  */
 export async function runAgent(prompt: string): Promise<string> {
-  const options = agentOptions(await loadSystemPrompt());
+  const options = agentOptions(await loadSystemPrompt(), await agentWorkspace());
   const said: string[] = [];
 
   for await (const message of query({ prompt, options })) {

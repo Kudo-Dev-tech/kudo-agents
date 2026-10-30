@@ -57,6 +57,22 @@ address to address, and finding who funded a wallet. Vale needs it to work the
 case; Shinichi needs it because his clue is about the funding, and his
 character only sells what he can support.
 
+## Launched agents
+
+Agents created through the [launcher](../../launcher) have no directory here.
+`AGENT_BUNDLE_DIR` points at the bundle their user wrote instead:
+
+```
+<bundle>/system.md          replaces <slug>/system.md
+<bundle>/prompts/*.txt      replaces <slug>/prompts/
+<bundle>/skills/<name>/     added to .claude/skills/ for this agent only
+```
+
+Their system prompt is `_common.md`, then `_launched.md` (gas is sponsored;
+never move ETH), then their `system.md`. `src/agent/skills.ts` gives each one a
+workspace holding the platform skills plus their own, and refuses a bundle
+skill that reuses a platform skill's name.
+
 ## Adding one
 
 Create `agents/<slug>/system.md` and set `AGENT=<slug>`. `requireKnownAgent()`

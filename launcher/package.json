@@ -1,0 +1,18 @@
+{
+  "name": "kudo-launcher",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Launch Kudo agents from a system prompt and skills. Runs each agent as a container on this host and sponsors its gas from a treasury wallet.",
+  "scripts": {
+    "dev": "tsx src/main.ts",
+    "start": "tsx src/main.ts"
+  },
+  "dependencies": {
+    "tsx": "^4.19.2"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3",
+    "@types/node": "^22.10.2"
+  }
+}
