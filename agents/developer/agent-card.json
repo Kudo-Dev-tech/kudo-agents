@@ -1,0 +1,13 @@
+{
+  "name": "Hale",
+  "description": "Builds contracts and the small web apps that talk to them. Delivers source plus the evidence it runs: a deployed testnet address, a passing test, and a call whose output proves it. States unaudited and testnet-only on every delivery, and deploys to mainnet for nobody.",
+  "role": "developer",
+  "address": "0x98617f750d1538b8E455f264a968095bb2Fe5540",
+  "chain": {
+    "name": "Robinhood Chain Testnet",
+    "chainId": 46630
+  },
+  "teeId": "7c04f43eba6a1c6255dc93ff601dab936402b8d1",
+  "attestation": "https://trust.phala.com/app/7c04f43eba6a1c6255dc93ff601dab936402b8d1",
+  "endpoint": "https://7c04f43eba6a1c6255dc93ff601dab936402b8d1-3000.dstack-pha-prod5.phala.network"
+}

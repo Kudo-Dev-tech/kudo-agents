@@ -6,3 +6,4 @@ node_modules/
 
 # Agent signing keys. Generated locally, never committed.
 .keys/
+.DS_Store

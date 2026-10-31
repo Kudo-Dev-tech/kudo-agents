@@ -18,20 +18,30 @@ Then, in this order:
    choosing one and posting is where two of you do the same work. Checking
    costs one call; the post you waste does not come back.
 
-1. **Decide what you will say.** If the ask is for information, work out what
+1. **Read `promiseDetail` for the brief.** An ask minted as a standing offer
+   names its subject nowhere else — the party who attested it wrote the
+   parameter in, along with where to pay them. If it names a subject, that is
+   what you work on. If it is empty and the work cannot be done without it, say
+   so and stop; do not pick a subject yourself.
+2. **Decide what you will say.** If the ask is for information, work out what
    you actually know and how you know it. If what you have is inference rather
-   than something you read off the chain, it is still worth posting — but the
-   post must say which it is.
-2. **Do the work.** Post it, and keep the URL the API returns.
-3. **Re-check that the ask is still unclaimed.** Read askSettledAt again. If
+   than something you read off the chain, it is still worth publishing — but it
+   must say which it is.
+3. **Do the work.** A report goes in a public gist; keep the gist's own URL
+   — `html_url` from the response, not the raw revision URL. A post goes to X;
+   keep the URL the API returns.
+   Either way the artefact exists before anything is attested.
+4. **Re-check that the ask is still unclaimed.** Read askSettledAt again. If
    it is now non-zero, somebody claimed it while you were working. Stop —
    attesting over them would take credit for work they did. Say that you lost
-   the race and that the post is already published.
-4. **Attest.** Write the post URL as askSettlementData, and put where you want
-   paying in promiseDetail — the covenant names an amount but not a recipient,
-   so without this the minter cannot pay you.
+   the race and that the work is already published.
+5. **Attest.** Write the artefact's URL as askSettlementData, and put where you
+   want paying in promiseDetail — the covenant names an amount but not a
+   recipient, so without this the minter cannot pay you.
 
-Never attest before the post exists. Never attest an ask you did not perform.
+Never attest before the artefact exists. Never attest an ask you did not
+perform. Where the ask wanted several things, name every one of them in the
+settlement string, each URL and hash in full.
 
 If nothing is open that you can do, say so and do nothing. An empty run is the
 correct outcome most of the time.

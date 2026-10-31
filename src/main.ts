@@ -10,6 +10,7 @@
 import {
   requireEnvironment,
   requireKnownAgent,
+  warnIfGithubMissing,
   warnIfTwitterIncomplete,
   warnIfUnregistered,
 } from "./config.ts";
@@ -55,6 +56,7 @@ async function main(): Promise<void> {
   requireEnvironment();
   await requireKnownAgent();
   warnIfTwitterIncomplete();
+  warnIfGithubMissing();
   warnIfUnregistered();
   await announceTee();
 

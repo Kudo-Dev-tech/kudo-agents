@@ -107,6 +107,9 @@ function startJob(spec: JobSpec): Job {
   let running = true;
   let inFlight: Promise<unknown> = Promise.resolve();
 
+  /** Ends the wait early. Set only while this job is sleeping. */
+  let wake: (() => void) | undefined;
+
   async function once(): Promise<void> {
     try {
       const prompt = await loadPrompt(spec.prompt);
@@ -118,17 +121,35 @@ function startJob(spec: JobSpec): Job {
     }
   }
 
+  /**
+   * The wait between runs, which stop() can cut short.
+   *
+   * A bare setTimeout cannot be cancelled by flipping a flag, so both the
+   * timer and its resolver are held where stop() can reach them. Without
+   * that, a stopping process would sit out the rest of the interval —
+   * long enough, at these intervals, to be SIGKILLed mid-shutdown instead.
+   */
+  function sleep(ms: number): Promise<void> {
+    return new Promise((resolve) => {
+      const finish = () => {
+        clearTimeout(timer);
+        wake = undefined;
+        resolve();
+      };
+      const timer = setTimeout(finish, ms);
+      wake = finish;
+    });
+  }
+
   async function loop(): Promise<void> {
     log(spec.prompt, `every ${spec.intervalSeconds}s`);
     while (running) {
       inFlight = once();
       await inFlight;
 
-      // Interruptible, so stopping does not sit out the whole interval.
-      const until = Date.now() + spec.intervalSeconds * 1000;
-      while (running && Date.now() < until) {
-        await new Promise((r) => setTimeout(r, Math.min(1000, until - Date.now())));
-      }
+      // Checked here too: stop() during a run leaves nothing to wake.
+      if (!running) break;
+      await sleep(spec.intervalSeconds * 1000);
     }
     log(spec.prompt, "stopped");
   }
@@ -138,6 +159,7 @@ function startJob(spec: JobSpec): Job {
   return {
     stop() {
       running = false;
+      wake?.();
     },
     async whenIdle() {
       await inFlight;

@@ -16,6 +16,11 @@ Take them one at a time. For each:
    what the ask required. Do not reason from the covenant text about what the
    evidence probably shows.
 
+   A hash is decoded, a post is looked up, a report is fetched. Where the
+   settlement string names several things, check all of them. Where it names a
+   gist, the URL must pin a revision — an unpinned one is a leg you could not
+   establish, not a leg that passed.
+
 3. **Check the promise's evidence**, the same way.
 
 4. **Decide.**
@@ -35,8 +40,8 @@ the call is close, prefer the recoverable one.
 A failed lookup is not proof of absence. A rate limit or a network error means
 you could not check, not that the thing is missing. Leave it open.
 
-A post being up does not make it true. A clue bought and posted performs its
-ask whatever the clue says — close it COMPLETED. Judging the truth of a claim
+A post being up does not make it true. A report bought and posted performs its
+ask whatever the report says — close it COMPLETED. Judging the truth of a claim
 is not your job.
 
 Where an ask wanted a judgement rather than an act — a report that is right,

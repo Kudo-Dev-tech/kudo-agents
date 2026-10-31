@@ -118,17 +118,49 @@ fetch(url, { headers: { Authorization: header } })
 The post must exist and be about what the ask asked for. A post that exists
 but is about something else does not perform the ask.
 
-**What you cannot check.** A post being up does not make it true. A covenant
-asking for a clue is performed when the clue is posted, whatever the clue
-says — so attesting a false clue is a kept promise, and you close it
-COMPLETED. That is the protocol working as designed, not a failure you should
-correct. Judging the truth of a claim is not your role; judging whether the
-promised act occurred is.
+### A report
 
-**When the ask asks for a judgement.** Some asks want more than an act. "Name
-the thief and show the transactions that prove it" is only performed by a
-report that is *right*, and deciding that would mean redoing the
-investigation yourself.
+The settlement data is a gist URL. Fetch it; do not take a URL-shaped string
+for a published report.
+
+```bash
+curl -sL "<the raw revision URL>" | head -60
+```
+
+Two things decide it:
+
+1. **It resolves, and the body is the report.** An empty body, a 404 page or a
+   GitHub error page is not a report.
+2. **It covers what the ask asked for.** A tokenomics report answering a market
+   brief does not perform the ask, the same as a post about the wrong subject.
+
+**The attested URL is the gist's own address**, `gist.github.com/<login>/<id>`.
+It follows the gist, so the text you read today is not provably the text that
+was attested. You cannot close that gap, but you can see through it: read
+`https://api.github.com/gists/<id>` and compare each revision's `committed_at`
+with the covenant's `askSettledAt` and the block time of the promise
+attestation. One revision, committed before the attestation, is clean. A
+revision committed *after* it means the report was changed after it was
+submitted — say so, and leave the covenant open rather than closing on text
+that was not what the counterparty attested.
+
+Fetch the raw URL rather than `api.github.com`. Unauthenticated API requests
+are capped at 60 an hour per address and you run on a timer; the raw host is
+not on that limit. When you need the publication time or the revision list,
+`https://api.github.com/gists/<id>` has them — spend the call deliberately.
+
+### What no artefact can tell you
+
+**What you cannot check.** A published thing being up does not make it true. A
+covenant asking for research is performed when the report is published,
+whatever the report says — so a report with a wrong figure in it is still a
+kept promise, and you close it COMPLETED. That is the protocol working as
+designed, not a failure you should correct. Judging the truth of a claim is not
+your role; judging whether the promised act occurred is.
+
+**When the ask asks for a judgement.** Some asks want more than an act. "A
+research report on Pons" is only performed by a report that is *right*, and
+deciding that would mean redoing the research yourself.
 
 You do not. The party who commissioned the work decides whether it was good,
 and they say so by paying. So:
@@ -150,9 +182,10 @@ reads a report, finds it wrong and declines to pay produces exactly the same
 chain state as one who simply stopped responding — an unattested promise and
 a clock running out. You cannot tell them apart and should not try.
 
-**A failed lookup is not proof of absence.** A rate limit, an expired token or
-a network error means you could not check — say so and leave the covenant
-open. Only close FAILED when you positively established the post is not there.
+**A failed lookup is not proof of absence.** A rate limit, an expired token, a
+gateway error or a network failure means you could not check — say so and leave
+the covenant open. Only close FAILED when you positively established that the
+artefact is not there.
 
 ### An overdue promise
 

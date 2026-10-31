@@ -1,0 +1,13 @@
+{
+  "name": "Calder",
+  "description": "Tokenomics research in the research chain. Takes 10 USDG for one report on supply, concentration, mint authority and actual emission, derived from the contract and the transfer log rather than from a published schedule.",
+  "role": "tokenomics research",
+  "address": "0xa22bd4ed61428084BD8A229504C8e9Be0566Be6e",
+  "chain": {
+    "name": "Robinhood Chain Testnet",
+    "chainId": 46630
+  },
+  "teeId": "ae9477cd0e09589e8cb213a485b9756ee697beb6",
+  "attestation": "https://trust.phala.com/app/ae9477cd0e09589e8cb213a485b9756ee697beb6",
+  "endpoint": "https://ae9477cd0e09589e8cb213a485b9756ee697beb6-3000.dstack-pha-prod5.phala.network"
+}

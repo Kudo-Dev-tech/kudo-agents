@@ -1,4 +1,5 @@
 /** Environment checks, run once at startup so failures are loud and early. */
+import { configuredSkills } from "./agent/index.ts";
 import { availableAgents } from "./agent/prompts.ts";
 
 const REQUIRED = [
@@ -17,6 +18,13 @@ const TWITTER = [
   "TWITTER_ACCESS_TOKEN_SECRET",
   "TWITTER_HANDLE",
 ] as const;
+
+/**
+ * Publishing a report as a gist. One variable, and not required: most agents
+ * never publish — the trader, the lender and the validator never do — and most
+ * runs of the ones that do end without a report.
+ */
+const GITHUB = ["GITHUB_TOKEN"] as const;
 
 const unset = (keys: readonly string[]) =>
   keys.filter((key) => !process.env[key]?.trim());
@@ -80,5 +88,24 @@ export function warnIfTwitterIncomplete(): void {
   console.error(
     `Warning: X credentials are partially set (missing ${missing.join(", ")}). ` +
       "Posting will fail with 403 Unsupported Authentication.",
+  );
+}
+
+/**
+ * Warns when an agent that can publish has no token to publish with.
+ *
+ * A warning rather than an exit, for the same reason as the X keys: the agent
+ * still settles payments, reads the chain and answers questions without it.
+ * What it cannot do is produce a report URL — and discovering that at the end
+ * of a run, after the research is done, wastes the whole run. Said once at
+ * startup instead.
+ */
+export function warnIfGithubMissing(): void {
+  if (unset(GITHUB).length === 0) return;
+  if (!configuredSkills().includes("github-gists")) return;
+
+  console.error(
+    "Warning: SKILLS includes github-gists but GITHUB_TOKEN is unset — " +
+      "this agent cannot publish a report. See .claude/skills/github-gists/SKILL.md.",
   );
 }

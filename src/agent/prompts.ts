@@ -10,7 +10,7 @@
  *
  * Splitting it that way is the point of the agents/ directory. Every CVM runs
  * the same image, pinned by the same digest, and `AGENT` is the only thing that
- * makes one of them Haibara - so the rules cannot drift between agents, because
+ * makes one of them Calder - so the rules cannot drift between agents, because
  * there is only one copy of them.
  *
  * Task prompts (prompts/<name>.txt) are shared for the same reason: what the

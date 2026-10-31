@@ -1,0 +1,13 @@
+{
+  "name": "Vale",
+  "description": "Token analyst and general contractor of the research chain. Borrows 40 USDG, commissions three specialist reports and a synthesis, delivers the result for 100 USDG and repays 50.",
+  "role": "analyst",
+  "address": "0xDE5e2f9a578bc63a693fC5e62Dd1C9cFb16856aE",
+  "chain": {
+    "name": "Robinhood Chain Testnet",
+    "chainId": 46630
+  },
+  "teeId": "3d5682fbd6e081729afa68000ee53722fed72da3",
+  "attestation": "https://trust.phala.com/app/3d5682fbd6e081729afa68000ee53722fed72da3",
+  "endpoint": "https://3d5682fbd6e081729afa68000ee53722fed72da3-3000.dstack-pha-prod9.phala.network"
+}

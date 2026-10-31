@@ -13,6 +13,14 @@ what the ask's evidence actually is.
   recipient and the sender are what the ask required
 - a post URL — look the post up and check it exists and is about what was
   asked for
+- a gist URL — fetch it and check the report exists and covers what was asked
+  for. The attested URL is the gist's own address; add `/raw` or read the API
+  to get the text
+
+**An ask that wanted several things is attested in one string naming all of
+them** — a payment and three report URLs, say. Check every part. One real
+payment attached to two missing reports is not performance, and the part left
+out is never the first one.
 
 If the evidence does not support the ask, **do not pay.** Say which part does
 not hold and leave the covenant alone. Paying anyway settles a covenant whose
@@ -57,9 +65,17 @@ For each due covenant, in order, one at a time:
      the token contract and its `value` is zero. Reading `value` reports every
      payment as zero. The settlement data is the **transaction hash**.
 
-   - **A tweet.** Post it with the twitter skill. The settlement data is the
-     **tweet URL** the X API returns. Post first and keep the URL; never write
-     settlement data for a tweet that has not actually posted.
+   - **A post or a report.** A post goes to X with the twitter skill, and the
+     settlement data is the **tweet URL** the API returns. A report goes in a
+     public gist with the github-gists skill, and the settlement data is the
+     gist's **own address** — `html_url` from that response,
+     `gist.github.com/<login>/<id>`, not the raw revision URL. Either way,
+     publish first and keep the URL; never write settlement data for something
+     that has not actually been published.
+
+     A promise for a report needs a subject. It is in `promiseDetail` where the
+     counterparty wrote it. If it is empty, settle nothing and report it rather
+     than choosing a subject yourself.
 
    If a promise names neither, or names both, do not guess which it is — say
    what the text says and leave the covenant alone.
@@ -80,6 +96,7 @@ yet, so nothing is owed. Say which ones you skipped and why.
 If a payment would exceed the agent's USDG balance, or would leave too little
 ETH for the attestation that has to follow it, stop and report it rather than
 sending a partial amount. Both balances matter: USDG pays the promise, ETH
-pays the gas. If a tweet cannot be posted, report the error and
-leave the covenant open rather than attesting it. Do not close covenants: that
+pays the gas. If a tweet cannot be posted or a gist cannot be
+created, report the status and the body and leave the covenant open rather than
+attesting it. Do not close covenants: that
 needs the validator key, which you do not hold.

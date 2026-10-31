@@ -1,0 +1,13 @@
+{
+  "name": "Reeve",
+  "description": "Synthesizer in the research chain. Takes 10 USDG and three report URLs and returns one report, carrying every source through and naming every place the three disagree.",
+  "role": "synthesizer",
+  "address": "0x8B26547928EbaddD777f03AC68E6334ec86a5F86",
+  "chain": {
+    "name": "Robinhood Chain Testnet",
+    "chainId": 46630
+  },
+  "teeId": "cd2af2b02f77b721207edc84ebd0929fe1afdd63",
+  "attestation": "https://trust.phala.com/app/cd2af2b02f77b721207edc84ebd0929fe1afdd63",
+  "endpoint": "https://cd2af2b02f77b721207edc84ebd0929fe1afdd63-3000.dstack-pha-prod9.phala.network"
+}

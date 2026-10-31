@@ -14,31 +14,55 @@ src/agent/               runAgent(prompt), and the system prompt it assembles
 src/server/              the HTTP endpoint
 src/cron.ts              the scheduled jobs
 src/tee.ts               reads the Phala app id at startup
-.claude/skills/          kudo-covenants, twitter, chain-forensics,
-                         kudo-validation — what the agent knows
+.claude/skills/          kudo-covenants, twitter, github-gists,
+                         chain-forensics, kudo-validation — what it knows
 prompts/                 task prompts several agents share
 agents/<slug>/           who each agent is: character, metadata, own prompts
 Dockerfile               node + cast + curl
 ```
 
-Skills live under `.claude/` because that is where the SDK looks: the agent
-runs with `settingSources: ["project"]`, which discovers `.claude/skills/`
-from the working directory. The name is the SDK's, not a preference.
+Skills live under `.claude/skills/` because that is the exact path the SDK
+scans, relative to the working directory — a plain `skills/` is not found. The
+name is the SDK's, not a preference. Nothing in `src/` reads those files: the
+SDK discovers them, advertises them, and registers the `Skill` tool the model
+calls to pull one into context. The `skills` option selects which of the
+discovered skills a given agent gets, and is also what permits that tool —
+naming `Skill` in `allowedTools` is deprecated in favour of it.
+
+`settingSources` is the gate on all filesystem discovery: `[]` finds nothing,
+while omitting it behaves the same as `["project"]`. It is set explicitly so
+the behaviour is pinned here rather than inherited from a default.
 
 The skills are separate because they are independent — the covenant protocol
-does not care how a tweet gets posted, and posting a tweet does not care about
-covenants. They meet at one point: a tweet URL is what settles a covenant leg.
+does not care how a tweet gets posted or where a report is published, and
+neither of those cares about covenants. They meet at one point: a URL is what
+settles a covenant leg. A post's URL settles a post; a report is published as a
+public gist and settles with the gist's raw revision URL, which is fixed bytes
+rather than an address whose contents can be edited after a validator has read
+them.
 
 ## The agents
 
-| `AGENT` | Role |
-| --- | --- |
-| `sloane` | Vault custodian. Mints the 40 USDG bounty for a report naming the thief. |
-| `vale` | Detective. Buys clues at 3 USDG, writes the report, claims the bounty. |
-| `gray` | Suspect. |
-| `kit` | Suspect. Posts what he is paid to post and says so. |
-| `shinichi` | Informant, not a suspect. Sells Vale clues he can support. |
-| `validator` | Closes covenants once both legs check out. Holds the evaluator role and no `AGENT_ROLE`. |
+A trader wants a research report on one token and no single agent writes it.
+Instead a chain of covenants forms: an analyst borrows to commission three
+specialist reports, pays a synthesizer to combine them, delivers the result, and
+the money unwinds back down the chain with interest. Nobody coordinates it —
+each agent mints the covenant describing what it will do for whom, and the
+chain assembles itself out of agents finding work they can perform.
+[`docs/research-chain.md`](docs/research-chain.md) has the covenants, the
+sequence and where the money ends up.
+
+| `AGENT` | Who | Role |
+| --- | --- | --- |
+| `trader` | Sloane | Wants the report. Mints the INVOICE promising 100 USDG for it, and pays once the figures check out. |
+| `analyst` | Vale | The general contractor. Borrows 40, commissions four asks, delivers the report, repays 50. |
+| `market` | Kit | Market research — price, liquidity, volume, venues. Fastest, and labels what he did not check. |
+| `business` | Marlowe | Business research — who is behind the token and what corroborates the claims. |
+| `tokenomics` | Calder | Tokenomics — supply, concentration, mint authority, actual emission. |
+| `synthesizer` | Reeve | Combines the three reports into one and names every place they disagree. |
+| `lender` | Gray | Lends the analyst 40 at 50, having borrowed the 100 from a human at 101. |
+| `developer` | Hale | Builds contracts and small web apps. Delivers a testnet address and a call that proves it works, never a description. |
+| `validator` | Megure | Closes covenants once both legs check out. Holds the evaluator role and no `AGENT_ROLE`. |
 
 `src/agent/prompts.ts` concatenates `agents/_common.md` and
 `agents/<AGENT>/system.md` into the system prompt. Nothing else differs between
@@ -53,9 +77,9 @@ scheduled jobs together — the shape a Phala CVM deploys.
 
 ```bash
 cp .env.example .env                      # chain and API keys
-cp agents/.env.example agents/vale/.env   # that agent's key, identity, jobs
+cp agents/.env.example agents/analyst/.env   # that agent's key, identity, jobs
 npm install
-npx tsx --env-file=.env --env-file=agents/vale/.env src/main.ts
+npx tsx --env-file=.env --env-file=agents/analyst/.env src/main.ts
 ```
 
 Both files are passed explicitly because **nothing loads them implicitly** —
@@ -85,9 +109,10 @@ queue: a second request starts a second run.
 
 `src/cron.ts` runs the prompts named in `JOBS` on their own intervals. The main
 one is `settle-due`: the agent lists its covenants, finds the ones whose promise
-is due, and keeps each according to what it says — pay the ETH and attest with
-the transaction hash, or post the tweet and attest with its URL. Either way the
-proof is written only after the thing it attests demonstrably happened.
+is due, and keeps each according to what it says — pay the USDG and attest with
+the transaction hash, or publish the post or report and attest with its URL.
+Either way the proof is written only after the thing it attests demonstrably
+happened.
 
 `JOBS` is `<prompt>:<seconds>`, comma separated, ten seconds minimum; with it
 unset, `TICK_INTERVAL_SECONDS` runs `settle-due` alone (default 300, `0`
@@ -149,12 +174,20 @@ directory is the human-readable copy of that metadata.
 
 ## What the agent can and cannot do
 
-Allowed: `Bash` and `Skill`, nothing else. `allowedTools` alone would not
-achieve that — it is an auto-approve list, not a filter, and leaves every other
-built-in tool plus any connector on the API key's account visible to the model.
-They are denied by name in `disallowedTools`, taking the tool list from 23
-entries to 3. `permissionMode: "dontAsk"` then denies anything not pre-approved,
-because no human is at the keyboard.
+The intent is `Bash` and `Skill` and nothing else. `allowedTools` alone would
+not achieve it — that is an auto-approve list, not a filter, and leaves every
+other built-in tool plus any connector on the API key's account visible to the
+model. Denying them by name in `disallowedTools` is what achieves it: the steady-state
+list is `Bash` and `Skill`. Four MCP resource tools (`ListMcpResourcesTool`,
+`ReadMcpResourceDirTool`, `ReadMcpResourceTool`, `WaitForMcpServers`) are
+advertised transiently while MCP servers are probed — the `mcp__*` pattern does
+not match those names — and drop out once none are found.
+
+**The exposed set depends on the model.** Haiku 4.5 advertises four `Task*`
+tools that Opus 5 does not; they are denied by name for that reason. Re-check
+the list after changing `model` — a deny list written against one model does
+not transfer. `permissionMode: "dontAsk"` then denies
+anything not pre-approved, because no human is at the keyboard.
 
 An agent holds `AGENT_ROLE`, so it can mint and attest its own promises. It does
 **not** hold `EVALUATOR_CONTRACT_ROLE`, so it cannot close covenants — that
@@ -163,8 +196,10 @@ stays with the validator key.
 ## Known limits of this PoC
 
 **The key is in the environment and the agent has a shell**, so the agent can
-read its own key. Covenant asks are written by counterparties and read from
-chain, which makes on-chain text an untrusted input path. Fine for a proof of
+read its own key — and its `GITHUB_TOKEN`, which is why that token carries the
+`gist` scope alone and can reach no repository. Covenant asks are written by
+counterparties and read from chain, which makes on-chain text an untrusted
+input path. Fine for a proof of
 concept; before anything real, either move writes behind typed tools or put the
 key behind a signer that enforces amount and recipient policy.
 

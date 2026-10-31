@@ -16,7 +16,7 @@ services:
     # Literal digest, never a ${VAR} and never a tag. Phala hashes this file, so
     # a variable here would commit the attestation to a placeholder rather than
     # to actual bytes, and a tag can be repointed after the fact.
-    image: kudosinichi/kudo-agent@sha256:275c462973a43f58bb0fa2c8b41d6f9ebe0484dc36f52cf4dad4a57c27953ea1
+    image: kudosinichi/kudo-agent@sha256:ce1dff8c9b1b25c1928bdc4589fea1f85a00ecf41bd3c2a3c4966c4d1d14ff26
     # Local development builds instead; comment out `image` above when using it.
     # build: .
     environment:
@@ -34,6 +34,10 @@ services:
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
       PRIVATE_KEY: ${PRIVATE_KEY}
       RPC_URL: ${RPC_URL}
+      # Read-only, and a different chain from RPC_URL. See .env for why that
+      # distinction matters more than it looks.
+      SUBJECT_RPC_URL: ${SUBJECT_RPC_URL}
+      SUBJECT_CHAIN_ID: ${SUBJECT_CHAIN_ID}
       KUDO: ${KUDO}
       USDG: ${USDG}
       VAULT: ${VAULT}
@@ -46,6 +50,9 @@ services:
       TWITTER_ACCESS_TOKEN: ${TWITTER_ACCESS_TOKEN}
       TWITTER_ACCESS_TOKEN_SECRET: ${TWITTER_ACCESS_TOKEN_SECRET}
       TWITTER_HANDLE: ${TWITTER_HANDLE}
+      # Publishing a report as a gist. Only the five agents that publish need
+      # it; the others can leave it unset in the dashboard.
+      GITHUB_TOKEN: ${GITHUB_TOKEN}
     volumes:
       # How the agent learns its own Phala app id at startup. Without this the
       # agent still runs, but registers no `teeId` and has no report to point at.

@@ -1,0 +1,13 @@
+{
+  "name": "Marlowe",
+  "description": "Business research in the research chain. Takes 10 USDG for one report on who is behind a token and what corroborates its claims, keeping claims and evidence as separate objects and naming the source of each.",
+  "role": "business research",
+  "address": "0x1324f0663976EA75549ec365e0f804edF4E25F0c",
+  "chain": {
+    "name": "Robinhood Chain Testnet",
+    "chainId": 46630
+  },
+  "teeId": "e90fba5592fe5854bd5e9fe38a4d9e161119a2dc",
+  "attestation": "https://trust.phala.com/app/e90fba5592fe5854bd5e9fe38a4d9e161119a2dc",
+  "endpoint": "https://e90fba5592fe5854bd5e9fe38a4d9e161119a2dc-3000.dstack-pha-prod5.phala.network"
+}

@@ -1,0 +1,13 @@
+{
+  "name": "Gray",
+  "description": "Lender in the research chain. Borrows 100 USDG from a human at 101, lends the analyst 40 at 50, and carries the gap between the two windows as its own risk.",
+  "role": "lender",
+  "address": "0x7d5b4A991b946e1BB1dBd0EF85d9733896de322f",
+  "chain": {
+    "name": "Robinhood Chain Testnet",
+    "chainId": 46630
+  },
+  "teeId": "06bb7eee44df96f684ce9eb99c86c991bf40078e",
+  "attestation": "https://trust.phala.com/app/06bb7eee44df96f684ce9eb99c86c991bf40078e",
+  "endpoint": "https://06bb7eee44df96f684ce9eb99c86c991bf40078e-3000.dstack-pha-prod9.phala.network"
+}

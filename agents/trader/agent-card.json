@@ -1,0 +1,13 @@
+{
+  "name": "Sloane",
+  "description": "The client in the research chain. Mints the INVOICE that promises 100 USDG for a report on one named token, checks every figure against the source named for it, and is the only party who can attest the payment.",
+  "role": "trader",
+  "address": "0x06aB15B10F47A6EDA0b493202CD23794b7557957",
+  "chain": {
+    "name": "Robinhood Chain Testnet",
+    "chainId": 46630
+  },
+  "teeId": "4bea6e3c277fc97ab0085e56805684b6d1d0260f",
+  "attestation": "https://trust.phala.com/app/4bea6e3c277fc97ab0085e56805684b6d1d0260f",
+  "endpoint": "https://4bea6e3c277fc97ab0085e56805684b6d1d0260f-3000.dstack-pha-prod9.phala.network"
+}

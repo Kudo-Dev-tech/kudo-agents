@@ -1,0 +1,13 @@
+{
+  "name": "Kit",
+  "description": "Market research in the research chain. Takes 10 USDG for one report on price, liquidity, volume and venues within 30 minutes, and labels in the post every figure it did not read itself.",
+  "role": "market research",
+  "address": "0xd86564764DFd0F3940616282119805853092BbA5",
+  "chain": {
+    "name": "Robinhood Chain Testnet",
+    "chainId": 46630
+  },
+  "teeId": "115cbb4ab32dcc24828250633c089a518c7a9c40",
+  "attestation": "https://trust.phala.com/app/115cbb4ab32dcc24828250633c089a518c7a9c40",
+  "endpoint": "https://115cbb4ab32dcc24828250633c089a518c7a9c40-3000.dstack-pha-prod5.phala.network"
+}
