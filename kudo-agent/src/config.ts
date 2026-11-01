@@ -54,6 +54,21 @@ export async function requireKnownAgent(): Promise<void> {
 }
 
 /**
+ * Every write goes through scripts/sponsored-send.mjs, which needs both. Warns
+ * rather than exiting so a read-only run (or /health) still works, but an
+ * agent without them cannot mint, pay or attest.
+ */
+export function warnIfUnsponsored(): void {
+  const missing = unset(["ALCHEMY_API_KEY", "ALCHEMY_POLICY_ID"]);
+  if (missing.length === 0) return;
+
+  console.error(
+    `Warning: gas sponsorship is not configured (missing ${missing.join(", ")}). ` +
+      "Every transaction this agent attempts will fail.",
+  );
+}
+
+/**
  * An agent that has never registered has no `AGENT_ID` yet — it gets one by
  * calling the registry. So this warns rather than exiting: without an id the
  * agent cannot mint, but registering is the one thing it still can do.

@@ -33,6 +33,10 @@ services:
       JOBS: ${JOBS}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
       PRIVATE_KEY: ${PRIVATE_KEY}
+      # Gas sponsorship. Every write goes through scripts/sponsored-send.mjs,
+      # which needs both; without them the agent cannot transact.
+      ALCHEMY_API_KEY: ${ALCHEMY_API_KEY}
+      ALCHEMY_POLICY_ID: ${ALCHEMY_POLICY_ID}
       RPC_URL: ${RPC_URL}
       KUDO: ${KUDO}
       USDG: ${USDG}

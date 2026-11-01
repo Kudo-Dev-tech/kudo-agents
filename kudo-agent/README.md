@@ -4,7 +4,8 @@ The Kudo covenant agent, built on the [Claude Agent SDK](https://code.claude.com
 Replaces the ElizaOS agent in `kudo-x402-agent/`.
 
 **No custom tools.** The agent works at a shell the way a person would: `cast`
-for the chain, `node` to sign X API requests. Everything it knows about the
+to read the chain, `scripts/sponsored-send.mjs` to write to it, `node` to sign
+X API requests. Everything it knows about the
 protocol lives in one skill file.
 
 ```
@@ -15,6 +16,8 @@ protocol lives in one skill file.
 agents/_common.md                        what every agent is told
 agents/<slug>/system.md                  who that one agent is - AGENT picks it
 prompts/settle-due.txt                   what the settler asks each round
+scripts/sponsored-send.mjs               every write: a gas-sponsored UserOperation
+scripts/provision-agent.mjs              key, .env and identity for a new agent
 src/main.ts                              the one entry point: server + settler
 src/agent/                               runAgent(prompt)
 src/server/                              the HTTP endpoint
@@ -33,7 +36,7 @@ One process, one entry point. `src/main.ts` starts the HTTP endpoint and the
 settlement loop together — the shape a Phala CVM deploys.
 
 ```bash
-cp .env.example .env     # fill in ANTHROPIC_API_KEY and PRIVATE_KEY
+cp .env.example .env     # fill in ANTHROPIC_API_KEY, ALCHEMY_API_KEY, ALCHEMY_POLICY_ID
 npm install
 npm run dev
 ```
@@ -54,6 +57,67 @@ curl -s localhost:3000/message -H 'content-type: application/json' \
 
 A run can take minutes, so `/message` disables the socket timeout. There is no
 queue: a second request starts a second run.
+
+## Gas sponsorship
+
+Agents hold no ETH. Every write — minting, attesting, USDG transfers,
+registering or updating an ERC-8004 identity, and the validator's
+`setCovenantStatus` — goes through `scripts/sponsored-send.mjs` instead of
+`cast send`:
+
+```bash
+node scripts/sponsored-send.mjs <to> "$(cast calldata '<sig>' <args…>)"
+```
+
+It sends the call through Alchemy's Wallet API as an ERC-4337 UserOperation
+with our Gas Manager policy attached. A paymaster cannot pay for a plain EOA
+transaction, so the agent's EOA is upgraded **in place** with EIP-7702: it is
+delegated to Alchemy's smart-account code and keeps its address. That matters
+because the ERC-8004 identity is owned by that address and every covenant names
+it as `agentWallet`; a separate smart account would have a new address and
+break both. The delegation is an authorization signed once, inside the
+address's first sponsored transaction. Reads still use `cast call`.
+
+Signing is done locally with `cast wallet sign`, so the script has no npm
+dependencies and Alchemy only ever sees signatures. Its exit code says whether
+the call landed (`0`), never reached the chain (`1`), reverted on chain (`2`),
+is unconfigured (`3`) or is of unknown outcome (`4` — never resend; re-check
+with `--status <callId>`). The `kudo-covenants` skill tells the agent what to
+do with each.
+
+Two consequences for anything reading the chain:
+
+- A sponsored transaction's `from` is the bundler and its `to` is the
+  EntryPoint. The actor is the `sender` of the EntryPoint's
+  `UserOperationEvent`, and a payer is the `from` of the token's `Transfer`
+  log. The skills, and kudo-client's activity feed, read it that way.
+- A bundle can hold several accounts' operations, so filter a receipt's logs
+  by contract and address rather than taking all of them.
+
+### Locking down the policy
+
+The policy is the only thing between a misbehaving agent and the whole
+sponsorship balance, so set it up in the Alchemy dashboard (Gas Manager →
+the policy → edit) before pointing agents at it:
+
+1. **Network** — the one `RPC_URL` points at. A policy belongs to one network.
+2. **Contract allowlist** — exactly three addresses, for that network:
+   `KUDO`, `USDG` and `IDENTITY_REGISTRY` from `.env`. The send script refuses
+   any other target too, but the policy is what actually holds.
+3. **Sender allowlist** — every agent address, including the validator's.
+   `provision-agent.mjs --no-register` prints a new agent's address before it
+   sends anything, so it can be added first.
+4. **Per-address spend cap** — with $100 in total, cap each sender well below
+   it (for example $10), so one runaway agent cannot drain the rest. Add a
+   per-operation cap too if the dashboard offers one.
+5. **Total spend cap** — the $100 itself, so the policy stops rather than
+   overdrawing.
+
+The validator is an agent like the others and runs `validate` with its own
+key; it needs no special handling beyond being on the sender allowlist.
+
+Point `.env` at the same network the policy is on. The Wallet API must support
+the chain; check the first sponsored send on testnet before mainnet.
 
 ## The settler
 
@@ -131,6 +195,10 @@ It holds `AGENT_ROLE`, so it can mint and attest its own promises. It does
 **not** hold `EVALUATOR_CONTRACT_ROLE`, so it cannot close covenants — that
 stays with the validator key.
 
+It cannot spend gas outside the policy: its address holds no ETH, and the
+sponsored path only reaches the three allowlisted contracts, up to its
+per-address cap.
+
 ## Known limits of this PoC
 
 **The key is in the environment and the agent has a shell**, so the agent can
@@ -143,6 +211,11 @@ tools or put the key behind a signer that enforces amount and recipient policy.
 repayment amount in code; here the model composes the whole `cast send`. The
 skill file compensates by stating amounts in ETH and keeping one numeral per
 promise, but that is a convention, not an enforcement.
+
+**`ALCHEMY_API_KEY` is in the environment too**, so the agent could in
+principle call Alchemy directly. That cannot spend more than the policy
+allows — the allowlists and spend caps are enforced by Alchemy, not by the
+script — which is why the policy, not the script, is the control that matters.
 
 **Settlement rounds cost a model call each.** The loop wakes on a timer and
 asks the agent to look, rather than waking on a chain event. A plain, model-free

@@ -31,6 +31,10 @@ RUN npm ci --omit=dev
 COPY tsconfig.json ./
 COPY src ./src
 COPY prompts ./prompts
+# The send script every write goes through (gas-sponsored UserOperations). It
+# is part of what the attestation covers, like the skills that tell the agent
+# to use it.
+COPY scripts ./scripts
 # Every character ships in the image, and AGENT picks one at runtime. Baking a
 # single agent in would mean four images and four digests, and the attestation
 # would then cover one character instead of the set.

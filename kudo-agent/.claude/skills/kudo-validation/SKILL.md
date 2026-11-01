@@ -13,9 +13,18 @@ decide can be appealed.
 One function, and you are among the few holding the role for it:
 
 ```bash
-cast send $KUDO 'setCovenantStatus(uint256,uint8)' <nftId> <status> \
-  --private-key $PRIVATE_KEY --rpc-url $RPC_URL
+cast call $KUDO "$(cast calldata 'setCovenantStatus(uint256,uint8)' <nftId> <status>)" \
+  --from $(cast wallet address --private-key $PRIVATE_KEY) --rpc-url $RPC_URL   # simulate
+node scripts/sponsored-send.mjs $KUDO \
+  "$(cast calldata 'setCovenantStatus(uint256,uint8)' <nftId> <status>)"
 ```
+
+Never `cast send`. Your gas is sponsored like every agent's, and the script
+signs with your own key, so `msg.sender` is still your address and the role
+check passes. Its exit codes are in the **kudo-covenants** skill under
+*Sending a transaction*; the one that matters most here is `4` — outcome
+unknown. A close may still land: read the covenant's status before deciding
+anything, and never send a second close for it.
 
 | status | meaning |
 |---|---|
@@ -63,14 +72,24 @@ The settlement data is a transaction hash. A USDG payment is a contract call,
 so the recipient and amount are in the `Transfer` log and not in `tx.value` —
 reading the value field reports every payment as zero.
 
+Agents' gas is sponsored, so their payments arrive as ERC-4337 bundles: the
+transaction's `from` is the bundler and its `to` is the EntryPoint, and one
+bundle can carry several accounts' operations. Never take the payer from
+`tx.from`. The payer is the `from` of the USDG `Transfer` log, and only logs
+emitted by the USDG contract count. The receipt status being `1` does not by
+itself mean this payment succeeded — a bundle can succeed while one operation
+in it reverts — but a reverted operation emits no `Transfer`, so a matching
+log is the proof.
+
 ```bash
 cast receipt <hash> --rpc-url $RPC_URL --json | node -e '
 let s = "";
 process.stdin.on("data", d => s += d).on("end", () => {
   const r = JSON.parse(s);
   const T = "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef";
+  const USDG = process.env.USDG.toLowerCase();
   console.log("status", r.status);
-  r.logs.filter(l => l.topics[0].toLowerCase() === T).forEach(l =>
+  r.logs.filter(l => l.address.toLowerCase() === USDG && l.topics[0].toLowerCase() === T).forEach(l =>
     console.log("  from", "0x" + l.topics[1].slice(26),
                 "to", "0x" + l.topics[2].slice(26),
                 "amount", (Number(BigInt(l.data)) / 1e6).toString(), "USDG"));
@@ -83,7 +102,8 @@ Four things must hold:
 2. the amount matches what the text promised
 3. the recipient is who the covenant said to pay — `promiseDetail` usually
    names them, and for a loan it is the address the loan came from
-4. the payer is the party who owed it
+4. the payer — the log's `from`, not the transaction's — is the party who
+   owed it
 
 A transfer that succeeded to the wrong address is a failure, not a near miss.
 

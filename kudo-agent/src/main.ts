@@ -12,6 +12,7 @@ import {
   requireKnownAgent,
   warnIfTwitterIncomplete,
   warnIfUnregistered,
+  warnIfUnsponsored,
 } from "./config.ts";
 import { startJobs } from "./cron.ts";
 import { startServer } from "./server/index.ts";
@@ -55,6 +56,7 @@ async function main(): Promise<void> {
   requireEnvironment();
   await requireKnownAgent();
   warnIfTwitterIncomplete();
+  warnIfUnsponsored();
   warnIfUnregistered();
   await announceTee();
 

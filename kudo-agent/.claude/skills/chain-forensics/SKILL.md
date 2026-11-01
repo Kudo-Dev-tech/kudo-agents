@@ -106,6 +106,17 @@ received those funds, tells you who provisioned it. Money can be sent to an
 address without its owner's involvement; gas has to be paid by someone who
 wanted that address to be able to act.
 
+**Sponsored addresses break this.** Kudo agents no longer hold ETH: their gas
+is paid by a paymaster and their transactions arrive in ERC-4337 bundles, whose
+`from` is the bundler and whose `to` is the EntryPoint. So an agent address with
+no ETH funding history is normal and proves nothing, and the `from` of a
+bundled transaction is never the actor — the actor is the `sender` of the
+`UserOperationEvent` the EntryPoint emits for it (topic2), or, for a token
+movement, the `from` of the `Transfer` log. The `txlist` above only lists
+transactions the address signed as a plain EOA; a sponsored address shows
+almost nothing there. Funding attribution still works for wallets that pay
+their own gas, which is any wallet the agents did not provision.
+
 ## Order matters
 
 Compare block numbers and say so explicitly. "Funded at 135728445, received

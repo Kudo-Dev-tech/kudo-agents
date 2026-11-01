@@ -1,6 +1,6 @@
 ---
 name: kudo-covenants
-description: Pay in USDG and check balances on Robinhood Chain, and mint or settle Kudo covenant NFTs. Use whenever the task involves sending USDG or reading a balance, borrowing or lending, agreeing to post a tweet in exchange for payment, attesting that a covenant leg was performed, closing a covenant, or reading covenant state. Covers the exact cast invocations, the contract's struct layout, which party may sign which attestation, and the revert selectors.
+description: Pay in USDG and check balances on Robinhood Chain, and mint or settle Kudo covenant NFTs. Use whenever the task involves sending USDG or reading a balance, borrowing or lending, agreeing to post a tweet in exchange for payment, attesting that a covenant leg was performed, closing a covenant, or reading covenant state. Covers the exact cast reads, the gas-sponsored send script every write goes through, the contract's struct layout, which party may sign which attestation, and the revert selectors.
 ---
 
 # Kudo covenants
@@ -9,8 +9,11 @@ A covenant is an on-chain agreement minted as an NFT (a "cNFT"). It carries an
 **ask** (what the counterparty does) and a **promise** (what this agent does in
 return), each attested on-chain by the party that performed it.
 
-Everything here runs through `cast`. No private key ever appears in output —
-always pass it as `--private-key $PRIVATE_KEY`.
+Reads run through `cast call`. **Writes never use `cast send`** — they go
+through `scripts/sponsored-send.mjs`, which has the gas paid for you (see
+**Sending a transaction** below). No private key ever appears in output — the
+script reads `$PRIVATE_KEY` itself, and where `cast` needs it, pass it as
+`--private-key $PRIVATE_KEY`.
 
 ## Environment
 
@@ -27,6 +30,8 @@ always pass it as `--private-key $PRIVATE_KEY`.
 | `TEE_ID` | Phala app id of the enclave this agent runs in |
 | `TEE_TRUST_URL` | that app's Phala Trust Center report |
 | `TEE_ID_SOURCE` | `dstack` if the enclave reported its own id, else `environment` |
+| `ALCHEMY_API_KEY` | used by the send script; never print it |
+| `ALCHEMY_POLICY_ID` | the Gas Manager policy that pays for your gas |
 
 Tweeting uses its own credentials — see the **twitter** skill.
 
@@ -49,7 +54,7 @@ and stop rather than guessing.
 
 ```bash
 cast chain-id --rpc-url $RPC_URL
-cast balance $(cast wallet address --private-key $PRIVATE_KEY) --rpc-url $RPC_URL
+test -n "$ALCHEMY_API_KEY" && test -n "$ALCHEMY_POLICY_ID" && echo sponsored || echo "NOT sponsored"
 cast call $KUDO "hasRole(bytes32,address)(bool)" \
   0xcab5a0bfe0b79d2c4b1c2e02599fa044d115b7511f9659307cb4276950967709 \
   $(cast wallet address --private-key $PRIVATE_KEY) --rpc-url $RPC_URL
@@ -58,6 +63,55 @@ cast call $KUDO "hasRole(bytes32,address)(bool)" \
 That role hash is `AGENT_ROLE`. If it returns `false`, `mintCovenant` reverts
 with `AccessForbidden` (`0xef67f5d8`) — the contract admin must grant the role;
 this agent cannot grant it to itself.
+
+You do not need ETH. Gas is sponsored, so an ETH balance of zero is normal
+and is not a reason to decline anything.
+
+## Sending a transaction
+
+Every write — minting, attesting, paying USDG, registering or updating your
+identity — is one call to the send script. It replaces `cast send`
+everywhere; **never use `cast send`**. Your address holds no ETH, so a
+`cast send` would fail, and if it did not, it would spend gas nobody budgeted.
+
+```bash
+node scripts/sponsored-send.mjs <contract> "$(cast calldata '<signature>' <args…>)"
+```
+
+It sends the call as a gas-sponsored UserOperation from **your own address**.
+On the target contract `msg.sender` is still you, so `AGENT_ROLE`, `ownerOf`
+and the `agentWallet == msg.sender` check behave exactly as they would for a
+plain transaction. The first send from a new address also delegates it with
+EIP-7702 — that happens inside the script and needs nothing from you.
+
+The pattern is always the same three steps:
+
+1. Build the calldata with `cast calldata` and the same signature and
+   arguments you would have given `cast send`.
+2. Simulate with `cast call <contract> <calldata> --from <your address>`.
+3. Send with the script.
+
+It prints one JSON object — `status`, `transactionHash`, `blockNumber`, and
+`logs`, which are **only the logs your call emitted**. Read events (a new
+token id, a `Registered` agent id, a `Transfer`) from those logs. The
+transaction hash is a bundle that may also carry other accounts' operations,
+so if you read it back with `cast receipt`, filter logs by your own address;
+and its `from` is the bundler, not you.
+
+Act on the exit code:
+
+| Exit | Meaning | What to do |
+|---|---|---|
+| `0` | confirmed | report the `transactionHash` |
+| `1` | not sent — refused before reaching the chain (bad input, target not allowed, sponsorship policy refused, simulation reverted) | report the error. Do not work around it |
+| `2` | landed but **reverted** — nothing changed | read the chain to see why before anything else |
+| `3` | sponsorship is not configured here | say so and stop. Do not fall back to `cast send` |
+| `4` | **outcome unknown** — sent, not yet confirmed | **never send it again.** Re-check with `node scripts/sponsored-send.mjs --status <callId>`, or read the chain |
+
+The script only sends to `$KUDO`, `$USDG` and `$IDENTITY_REGISTRY`; the
+sponsorship policy allows nothing else and caps what each address can spend.
+A refusal for budget means your share is used up — report it rather than
+retrying.
 
 ## Finding or creating this agent's identity
 
@@ -87,37 +141,41 @@ Include `teeId` **only** when `TEE_ID_SOURCE` is `dstack` (see below). With no
 TEE, register the name alone:
 
 ```bash
-cast send $IDENTITY_REGISTRY 'register(string,(string,bytes)[])' \
-  "" "[(name,$(cast from-utf8 "$AGENT_NAME"))]" \
-  --private-key $PRIVATE_KEY --rpc-url $RPC_URL --json
+node scripts/sponsored-send.mjs $IDENTITY_REGISTRY \
+  "$(cast calldata 'register(string,(string,bytes)[])' \
+      "" "[(name,$(cast from-utf8 "$AGENT_NAME"))]")"
 ```
 
 In a TEE, two entries:
 
 ```bash
-cast send $IDENTITY_REGISTRY 'register(string,(string,bytes)[])' \
-  "" "[(name,$(cast from-utf8 "$AGENT_NAME")),(teeId,$(cast from-utf8 "$TEE_ID"))]" \
-  --private-key $PRIVATE_KEY --rpc-url $RPC_URL --json
+node scripts/sponsored-send.mjs $IDENTITY_REGISTRY \
+  "$(cast calldata 'register(string,(string,bytes)[])' \
+      "" "[(name,$(cast from-utf8 "$AGENT_NAME")),(teeId,$(cast from-utf8 "$TEE_ID"))]")"
 ```
 
 The first argument is a token URI, left empty: the facts live in metadata
 rather than at a URL that may rot.
 
-The new id is in the receipt — no log scan needed, because you have the
-transaction hash. It is topic1 of the `Registered` event:
+The new id is in the script's own output — no log scan needed. It is topic1
+of the `Registered` event whose topic2 (`owner`) is you:
 
 ```
 Registered(uint256 indexed agentId, string agentURI, address indexed owner)
 topic0 = 0xca52e62c367d81bb2e328eb795f7c7ba24afb478408a26c0e201d155c449bc4a
 ```
 
+Pipe the send straight into the decode (or save its stdout and pipe that):
+
 ```bash
-cast receipt <tx-hash> --rpc-url $RPC_URL --json | node -e '
+node scripts/sponsored-send.mjs $IDENTITY_REGISTRY "<calldata from above>" | node -e '
 let s = "";
 process.stdin.on("data", d => s += d).on("end", () => {
+  const r = JSON.parse(s);
   const topic0 = "0xca52e62c367d81bb2e328eb795f7c7ba24afb478408a26c0e201d155c449bc4a";
-  const log = JSON.parse(s).logs.find(l => l.topics[0].toLowerCase() === topic0);
-  console.log(log ? BigInt(log.topics[1]).toString() : "NOT FOUND");
+  const log = r.logs.find(l => l.topics[0].toLowerCase() === topic0);
+  console.log("status", r.status, "tx", r.transactionHash);
+  console.log(log ? "agentId " + BigInt(log.topics[1]).toString() : "NOT FOUND");
 })'
 ```
 
@@ -224,9 +282,9 @@ an agent registered before it had a TEE, for instance — use `setMetadata`
 rather than registering again. Only the identity's owner may call it.
 
 ```bash
-cast send $IDENTITY_REGISTRY 'setMetadata(uint256,string,bytes)' \
-  $AGENT_ID "teeId" "$(cast from-utf8 "$TEE_ID")" \
-  --private-key $PRIVATE_KEY --rpc-url $RPC_URL
+node scripts/sponsored-send.mjs $IDENTITY_REGISTRY \
+  "$(cast calldata 'setMetadata(uint256,string,bytes)' \
+      $AGENT_ID "teeId" "$(cast from-utf8 "$TEE_ID")")"
 ```
 
 ### What `teeId` is
@@ -343,16 +401,18 @@ duplicated ones; an unreported duplicate is a false account of what is on chain.
 
 
 ```bash
-cast send $KUDO 'mintCovenant(uint256,string,string,string)' \
-  $AGENT_ID "<promise>" "<ask>" "<LOAN|INVOICE|ADVANCE>" \
-  --private-key $PRIVATE_KEY --rpc-url $RPC_URL --json
+node scripts/sponsored-send.mjs $KUDO \
+  "$(cast calldata 'mintCovenant(uint256,string,string,string)' \
+      $AGENT_ID "$PROMISE" "$ASK" "<LOAN|INVOICE|ADVANCE>")"
 ```
 
 Note the argument order: **promise comes before ask.**
 
-The new cNFT id is the `tokenId` of the `Transfer` event whose `from` is the
-zero address. Simulate first with `cast call` using the same signature to catch
-a revert before spending gas.
+The new cNFT id is the `tokenId` (topic3) of the `Transfer` event in the
+script's `logs` whose `from` is the zero address and whose `address` is
+`$KUDO`. Simulate first with `cast call` using the same signature to catch a
+revert before sending. Exit code `4` on a mint means the mint may still land:
+read the chain as described above, and never mint again to "retry".
 
 ## Finding this agent's covenants
 
@@ -451,10 +511,13 @@ A covenant has two legs and each is attested by whoever performed it.
 payment, a tweet URL for a post.
 
 ```bash
-cast send $KUDO 'setAskSettlementData(uint256,string,string)' \
-  <nftId> "<tx hash or URL>" "<promiseDetail>" \
-  --private-key $COUNTERPARTY_KEY --rpc-url $RPC_URL
+node scripts/sponsored-send.mjs $KUDO \
+  "$(cast calldata 'setAskSettlementData(uint256,string,string)' \
+      <nftId> "<tx hash or URL>" "<promiseDetail>")"
 ```
+
+Signed by the counterparty — the agent that performed the ask — with its own
+key, which is the `PRIVATE_KEY` the script reads.
 
 Three arguments. The third is **`promiseDetail`** — the counterparty's
 instruction for how to be paid, for example *"Please pay to 0x1BAB…ccf"*. It
@@ -473,13 +536,14 @@ performed as a counterparty. Calling it again overwrites both fields and resets
 **The promise** — written by this agent after keeping it.
 
 ```bash
-cast send $KUDO 'setPromiseSettlementData(uint256,string)' \
-  <nftId> "<tx hash or URL>" \
-  --private-key $PRIVATE_KEY --rpc-url $RPC_URL
+node scripts/sponsored-send.mjs $KUDO \
+  "$(cast calldata 'setPromiseSettlementData(uint256,string)' \
+      <nftId> "<tx hash or URL>")"
 ```
 
 Two arguments, not three. The contract enforces `msg.sender == agentWallet`, so
-only the owing agent can write it.
+only the owing agent can write it. A sponsored send keeps `msg.sender` as your
+own address, so this check passes exactly as before.
 
 **Never attest a leg that did not happen.** The settlement data is whatever
 proves the leg: a transaction hash for a payment, a tweet URL for a post. In
@@ -510,15 +574,14 @@ Older covenants on this contract were denominated and settled in ETH, from
 before USDG existed. Read them as the historical record they are; do not copy
 their method.
 
-### Balances — check both
+### Balance
 
-An agent needs USDG for the payment **and** ETH for the gas, and running out
-of either strands it mid-settlement.
+An agent needs USDG for the payment. Gas is sponsored, so ETH does not
+matter — a zero ETH balance is normal.
 
 ```bash
 ME=$(cast wallet address --private-key $PRIVATE_KEY)
 cast call $USDG 'balanceOf(address)(uint256)' $ME --rpc-url $RPC_URL   # 6dp base units
-cast balance $ME --rpc-url $RPC_URL                                     # wei, for gas
 ```
 
 Convert by hand: `1500000` base units is 1.5 USDG. `cast from-wei` is for ETH
@@ -528,23 +591,28 @@ figure.
 ### Sending
 
 ```bash
-cast send $USDG 'transfer(address,uint256)' <recipient> <amount-6dp> \
-  --private-key $PRIVATE_KEY --rpc-url $RPC_URL --json
+DATA=$(cast calldata 'transfer(address,uint256)' <recipient> <amount-6dp>)
+cast call $USDG $DATA --from $ME --rpc-url $RPC_URL     # simulate: returns true
+node scripts/sponsored-send.mjs $USDG $DATA
 ```
 
-So 40 USDG is `40000000`. Simulate first with `cast call` and the same
-arguments: ERC-20 `transfer` returns `true`, and a revert here usually means
-insufficient balance.
+So 40 USDG is `40000000`. ERC-20 `transfer` returns `true` in the simulation,
+and a revert there usually means insufficient balance.
 
 ### Verifying a payment — read the log, not the value
 
 This is the part that catches people. A USDG payment is a **contract call**,
 not a value-bearing transaction:
 
-- `cast tx <hash>` shows `to` = the **token contract**, and `value` = **0**
-- the real recipient and amount are in the `Transfer` event log
+- `cast tx <hash>` shows `to` = the **token contract** (or, for a sponsored
+  payment, the ERC-4337 EntryPoint, with the bundler as `from`), and
+  `value` = **0**
+- the real payer, recipient and amount are in the `Transfer` event log
 
-Checking `tx.value` reads every USDG payment as zero. Decode the log instead:
+Checking `tx.value` or `tx.from` tells you nothing about a USDG payment.
+Decode the log instead, and only logs emitted **by the USDG contract** — a
+sponsored payment's transaction can carry other accounts' operations and
+other tokens' transfers:
 
 ```
 Transfer(address indexed from, address indexed to, uint256 value)
@@ -560,8 +628,9 @@ let s = "";
 process.stdin.on("data", d => s += d).on("end", () => {
   const r = JSON.parse(s);
   const T = "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef";
+  const USDG = process.env.USDG.toLowerCase();
   console.log("status", r.status);
-  r.logs.filter(l => l.topics[0].toLowerCase() === T).forEach(l =>
+  r.logs.filter(l => l.address.toLowerCase() === USDG && l.topics[0].toLowerCase() === T).forEach(l =>
     console.log(
       "  from", "0x" + l.topics[1].slice(26),
       "to", "0x" + l.topics[2].slice(26),
@@ -569,10 +638,13 @@ process.stdin.on("data", d => s += d).on("end", () => {
 })'
 ```
 
-Confirm three things before treating a payment as made: the receipt status is
-`1`, the `to` in the log is the intended recipient, and the amount matches the
-promise. A transaction that succeeded while transferring to the wrong address
-is still a failure.
+Confirm four things before treating a payment as made: the receipt status is
+`1`, the `from` in the log is the payer, the `to` in the log is the intended
+recipient, and the amount matches the promise. A transaction that succeeded
+while transferring to the wrong address is still a failure. For your own
+payment, the script's exit `0` plus its `logs` already show this — the
+sponsored bundle's receipt status alone does not, because a bundle can succeed
+while one operation in it reverts.
 
 ### Where to send it
 
@@ -584,17 +656,23 @@ settle nothing and say so.
 
 ### Margin
 
-Treat the USDG balance as insufficient unless it exceeds the payment, and the
-ETH balance as insufficient unless it covers at least two more transactions —
-the transfer and the attestation that follows it. Say so and decline rather
-than sending part of an amount.
+Treat the USDG balance as insufficient unless it exceeds the payment. Say so
+and decline rather than sending part of an amount.
+
+Gas for the transfer and for the attestation that follows it is sponsored. If
+the attestation is then refused (exit `1` naming the policy or a spend limit),
+the payment has still happened: report the transaction hash and that the
+promise is paid but unattested, so it can be attested once sponsorship is
+restored. Never pay a second time to "redo" it.
 
 ## Closing
 
 ```bash
-cast send $KUDO 'setCovenantStatus(uint256,uint8)' <nftId> 1 \
-  --private-key $VALIDATOR_KEY --rpc-url $RPC_URL
+node scripts/sponsored-send.mjs $KUDO \
+  "$(cast calldata 'setCovenantStatus(uint256,uint8)' <nftId> 1)"
 ```
+
+Run by the validator, whose own `PRIVATE_KEY` the script reads.
 
 Requires `EVALUATOR_CONTRACT_ROLE`
 (`0x99ef5b3a4d98d7f6504cabe663cad9839659cc9575801fbc7b7fc7c82188a4a9`), which
@@ -620,10 +698,10 @@ data before the post has actually succeeded.
 
 ## One transaction at a time
 
-This chain produces blocks in roughly 0.2s, and sending again before the node
-has caught up gives `nonce has already been used` or `NonceTooLow`. Always wait
-for each receipt before the next send from the same account. `cast send` waits
-by default; do not background it or run two sends in parallel from one key.
+Two sends in flight from one account race for the same nonce and one of them
+is lost. The send script waits for confirmation before it exits; do not
+background it or run two at once from one key. Wait for each exit before the
+next send.
 
 ## Revert selectors
 
@@ -636,6 +714,10 @@ identify it.
 | `0xe2517d3f` | `AccessControlUnauthorizedAccount` | an `onlyRole` function refused — the data carries the account and the role hash |
 | `0x613970e0` | `InvalidParameter` | an argument the contract rejects, such as a zero address |
 | no data, `require(false)` | — | wrong function signature; re-check the argument count against this file |
+
+The send script reports a revert from its simulation as exit `1` with the
+same `execution reverted` data, and an on-chain revert as exit `2`; decode
+the selector the same way.
 
 `0xf480469b` (`ConditionIsNotMet`) belongs to an older deployment that enforced
 a credit score and a debt limit. This contract has neither — `getAgentDebt`,

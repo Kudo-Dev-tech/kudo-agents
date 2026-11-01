@@ -59,9 +59,26 @@ character only sells what he can support.
 
 ## Adding one
 
-Create `agents/<slug>/system.md` and set `AGENT=<slug>`. `requireKnownAgent()`
-checks at startup that the directory exists and lists what does, so a typo in
-`AGENT` fails immediately rather than mid-covenant.
+Write `agents/<slug>/system.md` — from the agent's plan, if it has one — then
+run the provisioning script from `kudo-agent/`:
+
+```bash
+node scripts/provision-agent.mjs <slug> --name "<AGENT_NAME>" --no-register
+# add the printed address to the Gas Manager policy's sender allowlist
+node scripts/provision-agent.mjs <slug> --name "<AGENT_NAME>"
+```
+
+It uses `.keys/<slug>.key` if it exists and generates it only if it is
+missing — never overwriting one, since that address owns an identity. It
+creates or updates `agents/<slug>/.env` with `AGENT`, `PRIVATE_KEY` and
+`AGENT_NAME`, then registers the ERC-8004 identity through the sponsored path
+(skipping it if the address already owns one) and writes `AGENT_ID` back. The
+new address needs no ETH. An admin still has to grant it `AGENT_ROLE`, and
+`JOBS`, `SKILLS` and `AGENT_ENDPOINT` are yours to fill in. The validator is
+provisioned the same way, from `.keys/validator.key`.
+
+`requireKnownAgent()` checks at startup that the directory exists and lists
+what does, so a typo in `AGENT` fails immediately rather than mid-covenant.
 
 A character file should cover the agent's situation, who they are, and their
 register. It should not restate anything in `_common.md` — if a rule needs to
